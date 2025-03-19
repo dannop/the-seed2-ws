@@ -12,8 +12,8 @@ const BroadcastInformation = () => {
       ...(typeof data === 'object' && data !== null ? data : {})
     }))
   };
+  console.log(DataToBeUpdated);
   const DataToSendString = JSON.stringify(DataToBeUpdated);
-  console.log(DataToSendString);
   wss.clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
       client.send(DataToSendString);
@@ -24,9 +24,14 @@ const BroadcastInformation = () => {
 wss.on('connection', (ws) => {
   ws.on('message', (message) => {
     const ParsedData = JSON.parse(message.toString());
+    
     if (ParsedData.type === 'PlayerData') {
       const { PlayerID, position, velocity, rotation, health } = ParsedData.data;
       PlayersData[PlayerID] = { position, velocity, rotation, health };
+      BroadcastInformation();
+    } else if (ParsedData.type === 'PlayerDisconnected') {
+      const { PlayerID } = ParsedData;
+      delete PlayersData[PlayerID];
       BroadcastInformation();
     }
   });
