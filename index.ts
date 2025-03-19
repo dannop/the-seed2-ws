@@ -8,11 +8,12 @@ const BroadcastInformation = () => {
   const DataToBeUpdated = {
     type: 'AllPlayerData',
     data: Object.entries(PlayersData).map(([id, data]) => ({
-      id,
+      PlayerID: id,
       ...(typeof data === 'object' && data !== null ? data : {})
     }))
   };
   const DataToSendString = JSON.stringify(DataToBeUpdated);
+  console.log(DataToSendString);
   wss.clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
       client.send(DataToSendString);
@@ -23,7 +24,6 @@ const BroadcastInformation = () => {
 wss.on('connection', (ws) => {
   ws.on('message', (message) => {
     const ParsedData = JSON.parse(message.toString());
-    console.log('ParsedData', ParsedData);
     if (ParsedData.type === 'PlayerData') {
       const { PlayerID, position, velocity, rotation, health } = ParsedData.data;
       PlayersData[PlayerID] = { position, velocity, rotation, health };
