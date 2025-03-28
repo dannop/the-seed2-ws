@@ -1,9 +1,9 @@
-import { IPlayer, Player } from "../models/Player";
+import { ICharacter, Character } from "../models/Character";
 
-export const getNearbyPlayers = async (player: IPlayer, maxDistance: number) => {
+export const getNearbyCharacters = async (player: ICharacter, maxDistance: number) => {
   const { x, y, z } = player.position;
 
-  return await Player.find({
+  return await Character.find({
     ws: { $ne: null },
     "position.x": { $gte: x - maxDistance, $lte: x + maxDistance },
     "position.y": { $gte: y - maxDistance, $lte: y + maxDistance },

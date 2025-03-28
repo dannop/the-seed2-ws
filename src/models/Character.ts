@@ -7,7 +7,7 @@ interface IPosition {
   z: number;
 }
 
-export interface IPlayer extends Document {
+export interface ICharacter extends Document {
   playerId: string;
   ws?: WebSocket | null;
   position: IPosition;
@@ -17,10 +17,10 @@ export interface IPlayer extends Document {
   animationState: any;
 }
 
-const PlayerSchema: Schema = new Schema(
+const CharacterSchema: Schema = new Schema(
   {
-    playerId: { type: String, required: true, unique: true },
-    ws: { type: Schema.Types.Mixed, required: true },
+    playerId: { type: String, unique: true },
+    ws: { type: Schema.Types.Mixed },
     position: { type: Schema.Types.Mixed, required: true },
     velocity: { type: Schema.Types.Mixed, required: true },
     rotation: { type: Schema.Types.Mixed, required: true },
@@ -30,4 +30,4 @@ const PlayerSchema: Schema = new Schema(
   { timestamps: true }
 );
 
-export const Player = mongoose.model<IPlayer>("Player", PlayerSchema);
+export const Character = mongoose.model<ICharacter>("Character", CharacterSchema);

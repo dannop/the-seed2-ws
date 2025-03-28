@@ -1,7 +1,7 @@
 import { WebSocket, WebSocketServer } from 'ws';
-import { IPlayer, Player } from './models/Player';
+import { ICharacter, Character } from './models/Character';
 import dotenv from "dotenv";
-// import { getNearbyPlayers } from './services/playerService';
+// import { getNearbyCharacters } from './services/characterService';
 import { connectDB } from './config/database';
 
 dotenv.config();
@@ -12,20 +12,20 @@ const wss = new WebSocketServer({ port: PORT });
 
 console.log(`🚀 WebSocket rodando na porta ${PORT}`);
 
-const broadcastInformation = async (currentPlayer: IPlayer) => {
-  console.log('currentPlayer.position', currentPlayer.position);
-  const nearbyPlayers = await Player.find({
+const broadcastInformation = async (currentCharacter: ICharacter) => {
+  console.log('currentCharacter.position', currentCharacter.position);
+  const nearbyCharacters = await Character.find({
     ws: { $ne: null }
   });
-  //const nearbyPlayers = await getNearbyPlayers(currentPlayer, 500);
-  // console.log('nearbyPlayers', nearbyPlayers.length);
+  // const nearbyCharacters = await getNearbyCharacters(currentCharacter, 500);
+  // console.log('nearbyCharacters', nearbyCharacters.length);
   
   const dataToSendString = JSON.stringify({
     type: 'AllPlayerData',
-    data: nearbyPlayers
+    data: nearbyCharacters
   });
 
-  // nearbyPlayers.forEach(player => {
+  // nearbyCharacters.forEach(player => {
   //   if (player.ws.readyState === WebSocket.OPEN) {
   //     player.ws.send(dataToSendString);
   //   }
@@ -53,16 +53,16 @@ wss.on('connection', (ws) => {
           animationState 
         } = ParsedData.data;
 
-        let player = await Player.findOne({ playerId: PlayerID });
-        if (player.ws) {
-          player.ws.send(JSON.stringify({
-            type: "DisconnectPlayer", 
-            status: "error", 
-            message: "Iniciada outra sessão" 
-          }));
-        }
+        // let player = await Character.findOne({ playerId: PlayerID });
+        // if (player.ws) {
+        //   player.ws.send(JSON.stringify({
+        //     type: "DisconnectPlayer", 
+        //     status: "error", 
+        //     message: "Iniciada outra sessão" 
+        //   }));
+        // }
 
-        player = await Player.findOneAndUpdate(
+        const player = await Character.findOneAndUpdate(
           { playerId: PlayerID },
           { ws, position, velocity, rotation, health, animationState },
           { new: true, upsert: true } // Cria se não existir, atualiza se existir
@@ -71,9 +71,9 @@ wss.on('connection', (ws) => {
         await broadcastInformation(player);
       } else if (ParsedData.type === 'PlayerDisconnected') {
         const { PlayerID } = ParsedData;
-        const player = await Player.findOneAndUpdate(
+        const player = await Character.findOneAndUpdate(
           { playerId: PlayerID }, 
-          { ws: null }
+          { playerId: '', ws: null}
         );
         await broadcastInformation(player);
       }
