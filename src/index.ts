@@ -8,7 +8,7 @@ dotenv.config();
 connectDB();
 
 const PORT = Number(process.env.PORT);
-const wss = new WebSocketServer({ port: PORT });
+const wss = new WebSocketServer({ port: PORT, host: '0.0.0.0' });
 
 console.log(`🚀 WebSocket rodando na porta ${PORT}`);
 
