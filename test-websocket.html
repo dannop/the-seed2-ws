@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste WebSocket - TheEmptySeed</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .connected { background-color: #d4edda; color: #155724; }
+        .disconnected { background-color: #f8d7da; color: #721c24; }
+        .connecting { background-color: #fff3cd; color: #856404; }
+        .log {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #6c757d; cursor: not-allowed; }
+        input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Teste WebSocket - TheEmptySeed</h1>
+        
+        <div>
+            <label for="serverUrl">URL do Servidor:</label>
+            <input type="text" id="serverUrl" value="ws://localhost:8080" style="width: 300px;">
+            <button onclick="connect()" id="connectBtn">🔗 Conectar</button>
+            <button onclick="disconnect()" id="disconnectBtn" disabled>❌ Desconectar</button>
+        </div>
+
+        <div id="status" class="status disconnected">
+            ❌ Desconectado
+        </div>
+
+        <div>
+            <h3>📤 Enviar Mensagem de Teste:</h3>
+            <button onclick="sendTestMessage()" id="sendBtn" disabled>📤 Enviar PlayerData</button>
+            <button onclick="sendDisconnectMessage()" id="disconnectMsgBtn" disabled>📤 Enviar PlayerDisconnected</button>
+        </div>
+
+        <div>
+            <h3>📋 Logs:</h3>
+            <button onclick="clearLog()">🗑️ Limpar Log</button>
+            <div id="log" class="log"></div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let playerId = 'test_player_' + Date.now();
+
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `[${timestamp}] ${message}\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function updateStatus(message, className) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = 'status ' + className;
+        }
+
+        function updateButtons(connected) {
+            document.getElementById('connectBtn').disabled = connected;
+            document.getElementById('disconnectBtn').disabled = !connected;
+            document.getElementById('sendBtn').disabled = !connected;
+            document.getElementById('disconnectMsgBtn').disabled = !connected;
+        }
+
+        function connect() {
+            const url = document.getElementById('serverUrl').value;
+            log(`🔗 Tentando conectar ao: ${url}`);
+            updateStatus('🔄 Conectando...', 'connecting');
+
+            try {
+                ws = new WebSocket(url);
+
+                ws.onopen = function() {
+                    log('✅ Conectado com sucesso!');
+                    updateStatus('✅ Conectado', 'connected');
+                    updateButtons(true);
+                };
+
+                ws.onmessage = function(event) {
+                    log(`📨 Recebido: ${event.data}`);
+                };
+
+                ws.onclose = function(event) {
+                    log(`🔌 Desconectado. Código: ${event.code}, Razão: ${event.reason}`);
+                    updateStatus('❌ Desconectado', 'disconnected');
+                    updateButtons(false);
+                };
+
+                ws.onerror = function(error) {
+                    log(`💥 Erro: ${error}`);
+                    updateStatus('❌ Erro de conexão', 'disconnected');
+                    updateButtons(false);
+                };
+
+            } catch (error) {
+                log(`💥 Erro ao criar WebSocket: ${error.message}`);
+                updateStatus('❌ Erro ao criar conexão', 'disconnected');
+            }
+        }
+
+        function disconnect() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+        }
+
+        function sendTestMessage() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                log('❌ WebSocket não está conectado');
+                return;
+            }
+
+            const testMessage = {
+                type: 'PlayerData',
+                data: {
+                    PlayerID: playerId,
+                    position: { x: 100.0, y: 200.0, z: 50.0 },
+                    velocity: { x: 0.0, y: 0.0, z: 0.0 },
+                    rotation: { x: 0.0, y: 45.0, z: 0.0 },
+                    health: 100.0,
+                    animationState: {
+                        isSprinting: false,
+                        isJumping: false,
+                        isMoving: false,
+                        currentAction: 'idle'
+                    }
+                }
+            };
+
+            const messageStr = JSON.stringify(testMessage, null, 2);
+            log(`📤 Enviando: ${messageStr}`);
+            ws.send(messageStr);
+        }
+
+        function sendDisconnectMessage() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                log('❌ WebSocket não está conectado');
+                return;
+            }
+
+            const disconnectMessage = {
+                type: 'PlayerDisconnected',
+                PlayerID: playerId
+            };
+
+            const messageStr = JSON.stringify(disconnectMessage, null, 2);
+            log(`📤 Enviando: ${messageStr}`);
+            ws.send(messageStr);
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        // Log inicial
+        log('🧪 Teste WebSocket iniciado');
+        log(`🆔 Player ID: ${playerId}`);
+    </script>
+</body>
+</html> 
