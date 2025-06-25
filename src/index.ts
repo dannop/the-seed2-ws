@@ -1,7 +1,7 @@
 import { WebSocket, WebSocketServer } from 'ws';
 import { ICharacter, Character } from './models/Character';
 import dotenv from "dotenv";
-// import { getNearbyCharacters } from './services/characterService';
+import { getNearbyCharacters } from './services/characterService';
 import { connectDB } from './config/database';
 
 dotenv.config();
@@ -14,26 +14,27 @@ console.log(`🚀 WebSocket rodando na porta ${PORT}`);
 
 const broadcastInformation = async (currentCharacter: ICharacter) => {
   console.log('📍 currentCharacter.position', currentCharacter.position);
-  const nearbyCharacters = await Character.find({
-    ws: { $ne: null }
-  });
-  // const nearbyCharacters = await getNearbyCharacters(currentCharacter, 500);
-  // console.log('nearbyCharacters', nearbyCharacters.length);
+  
+  // Buscar apenas jogadores próximos (dentro de 500 unidades)
+  const nearbyCharacters = await getNearbyCharacters(currentCharacter, 500);
+  console.log(`👥 [${currentCharacter.playerId}] Jogadores próximos: ${nearbyCharacters.length}`);
   
   const dataToSendString = JSON.stringify({
-    type: 'AllPlayerData',
-    data: nearbyCharacters
+    type: 'NearbyPlayers',
+    data: nearbyCharacters.map(char => ({
+      playerId: char.playerId,
+      position: char.position,
+      velocity: char.velocity,
+      rotation: char.rotation,
+      health: char.health,
+      animationState: char.animationState
+    }))
   });
 
-  // nearbyCharacters.forEach(player => {
-  //   if (player.ws.readyState === WebSocket.OPEN) {
-  //     player.ws.send(dataToSendString);
-  //   }
-  // });
-
-  wss.clients.forEach((client) => { 
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(dataToSendString);
+  // Enviar apenas para jogadores próximos
+  nearbyCharacters.forEach(player => {
+    if (player.ws && player.ws.readyState === WebSocket.OPEN) {
+      player.ws.send(dataToSendString);
     }
   });
 };
