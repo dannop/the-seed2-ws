@@ -13,7 +13,7 @@ const wss = new WebSocketServer({ port: PORT, host: '0.0.0.0' });
 console.log(`🚀 WebSocket rodando na porta ${PORT}`);
 
 const broadcastInformation = async (currentCharacter: ICharacter) => {
-  console.log('currentCharacter.position', currentCharacter.position);
+  console.log('📍 currentCharacter.position', currentCharacter.position);
   const nearbyCharacters = await Character.find({
     ws: { $ne: null }
   });
@@ -43,6 +43,8 @@ wss.on('connection', (ws) => {
   ws.on('message', async (message) => {
     try {
       const ParsedData = JSON.parse(message.toString());
+      console.log(`📨 Mensagem recebida do tipo: ${ParsedData.type}`);
+      
       if (ParsedData.type === 'PlayerData') {
         const { 
           PlayerID, 
@@ -52,6 +54,17 @@ wss.on('connection', (ws) => {
           health,
           animationState 
         } = ParsedData.data;
+
+        console.log(`🎮 [${PlayerID}] Dados recebidos:`);
+        console.log(`   📍 Posição: (${position.x.toFixed(1)}, ${position.y.toFixed(1)}, ${position.z.toFixed(1)})`);
+        console.log(`   🏃 Velocidade: (${velocity.x.toFixed(1)}, ${velocity.y.toFixed(1)}, ${velocity.z.toFixed(1)})`);
+        console.log(`   🔄 Rotação: (${rotation.x.toFixed(1)}, ${rotation.y.toFixed(1)}, ${rotation.z.toFixed(1)})`);
+        console.log(`   ❤️ Health: ${health}`);
+        console.log(`   🎭 Animation State:`);
+        console.log(`      - isSprinting: ${animationState.isSprinting}`);
+        console.log(`      - isJumping: ${animationState.isJumping}`);
+        console.log(`      - isMoving: ${animationState.isMoving}`);
+        console.log(`      - currentAction: ${animationState.currentAction}`);
 
         // let player = await Character.findOne({ playerId: PlayerID });
         // if (player.ws) {
@@ -68,17 +81,24 @@ wss.on('connection', (ws) => {
           { new: true, upsert: true } // Cria se não existir, atualiza se existir
         );
         
+        console.log(`✅ [${PlayerID}] Dados salvos no MongoDB`);
         await broadcastInformation(player);
+        console.log(`📡 [${PlayerID}] Dados broadcastados para ${wss.clients.size} clientes`);
+        
       } else if (ParsedData.type === 'PlayerDisconnected') {
         const { PlayerID } = ParsedData;
+        console.log(`❌ [${PlayerID}] Jogador desconectado`);
+        
         const player = await Character.findOneAndUpdate(
           { playerId: PlayerID }, 
           { playerId: '', ws: null}
         );
         await broadcastInformation(player);
+        console.log(`📡 [${PlayerID}] Desconexão broadcastada`);
       }
     } catch (error) {
       console.error("❌ Erro ao processar mensagem:", error);
+      console.error("📄 Mensagem original:", message.toString());
       ws.send(JSON.stringify({
         type: "DisconnectPlayer", 
         status: "error", 
