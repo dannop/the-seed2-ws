@@ -1,5 +1,4 @@
 import mongoose, { Schema, Document } from "mongoose";
-import { WebSocket } from "ws";
 
 interface IPosition {
   x: number;
@@ -9,7 +8,6 @@ interface IPosition {
 
 export interface ICharacter extends Document {
   playerId: string;
-  ws?: WebSocket | null;
   position: IPosition;
   velocity: any;
   rotation: any;
@@ -20,7 +18,6 @@ export interface ICharacter extends Document {
 const CharacterSchema: Schema = new Schema(
   {
     playerId: { type: String, unique: true },
-    ws: { type: Schema.Types.Mixed },
     position: { type: Schema.Types.Mixed, required: true },
     velocity: { type: Schema.Types.Mixed, required: true },
     rotation: { type: Schema.Types.Mixed, required: true },

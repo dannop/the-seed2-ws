@@ -10,6 +10,9 @@ connectDB();
 const PORT = Number(process.env.PORT);
 const wss = new WebSocketServer({ port: PORT, host: '0.0.0.0' });
 
+// Map para gerenciar conexões WebSocket em memória
+const playerConnections = new Map<string, WebSocket>();
+
 console.log(`🚀 WebSocket rodando na porta ${PORT}`);
 
 const broadcastInformation = async (currentCharacter: ICharacter) => {
@@ -18,6 +21,12 @@ const broadcastInformation = async (currentCharacter: ICharacter) => {
   // Buscar apenas jogadores próximos (dentro de 500 unidades)
   const nearbyCharacters = await getNearbyCharacters(currentCharacter, 500);
   console.log(`👥 [${currentCharacter.playerId}] Jogadores próximos: ${nearbyCharacters.length}`);
+  
+  // Log das conexões ativas
+  console.log(`🔗 Conexões ativas no Map: ${playerConnections.size}`);
+  for (const [playerId, ws] of playerConnections.entries()) {
+    console.log(`   - ${playerId}: ${ws.readyState === WebSocket.OPEN ? 'OPEN' : 'CLOSED'}`);
+  }
   
   const dataToSendString = JSON.stringify({
     type: 'NearbyPlayers',
@@ -31,12 +40,20 @@ const broadcastInformation = async (currentCharacter: ICharacter) => {
     }))
   });
 
-  // Enviar apenas para jogadores próximos
+  // Enviar apenas para jogadores próximos usando o Map de conexões
+  let sentCount = 0;
   nearbyCharacters.forEach(player => {
-    if (player.ws && player.ws.readyState === WebSocket.OPEN) {
-      player.ws.send(dataToSendString);
+    const playerWs = playerConnections.get(player.playerId);
+    if (playerWs && playerWs.readyState === WebSocket.OPEN) {
+      console.log(`📨 [${player.playerId}] Enviando dados para ${player.playerId}`);
+      playerWs.send(dataToSendString);
+      sentCount++;
+    } else {
+      console.log(`⚠️ [${player.playerId}] Conexão não encontrada ou fechada`);
     }
   });
+  
+  console.log(`✅ [${currentCharacter.playerId}] Dados enviados para ${sentCount} jogadores`);
 };
 
 wss.on('connection', (ws) => {
@@ -67,18 +84,12 @@ wss.on('connection', (ws) => {
         console.log(`      - isMoving: ${animationState.isMoving}`);
         console.log(`      - currentAction: ${animationState.currentAction}`);
 
-        // let player = await Character.findOne({ playerId: PlayerID });
-        // if (player.ws) {
-        //   player.ws.send(JSON.stringify({
-        //     type: "DisconnectPlayer", 
-        //     status: "error", 
-        //     message: "Iniciada outra sessão" 
-        //   }));
-        // }
+        // Adicionar/atualizar conexão no Map
+        playerConnections.set(PlayerID, ws);
 
         const player = await Character.findOneAndUpdate(
           { playerId: PlayerID },
-          { ws, position, velocity, rotation, health, animationState },
+          { position, velocity, rotation, health, animationState },
           { new: true, upsert: true } // Cria se não existir, atualiza se existir
         );
         
@@ -90,9 +101,12 @@ wss.on('connection', (ws) => {
         const { PlayerID } = ParsedData;
         console.log(`❌ [${PlayerID}] Jogador desconectado`);
         
+        // Remover conexão do Map
+        playerConnections.delete(PlayerID);
+        
         const player = await Character.findOneAndUpdate(
           { playerId: PlayerID }, 
-          { playerId: '', ws: null}
+          { playerId: ''}
         );
         await broadcastInformation(player);
         console.log(`📡 [${PlayerID}] Desconexão broadcastada`);
@@ -108,5 +122,54 @@ wss.on('connection', (ws) => {
     }
   });
 
-  ws.on("close", () => console.log("❌ Cliente desconectado"));
+  ws.on("close", () => {
+    console.log("❌ Cliente desconectado");
+    // Remover conexão do Map quando o WebSocket for fechado
+    for (const [playerId, connection] of playerConnections.entries()) {
+      if (connection === ws) {
+        playerConnections.delete(playerId);
+        console.log(`🗑️ [${playerId}] Conexão removida do Map`);
+        break;
+      }
+    }
+  });
 });
+
+// 1. Exemplo de mensagem recebida
+// {
+//   "type": "PlayerData",
+//   "data": {
+//     "PlayerID": "Postman_123",
+//     "position": { "x": 10, "y": 20, "z": 30 },
+//     "velocity": { "x": 0.5, "y": 0.5, "z": 0.5 },
+//     "rotation": { "x": 0, "y": 0, "z": 0 },
+//     "health": 100,
+//     "animationState": { "isSprinting": false, "isJumping": false, "isMoving": false, "currentAction": "idle" }
+//   }
+// }
+
+// 2. Exemplo de mensagem recebida de jogador proximo
+// {
+//   "type": "PlayerData",
+//   "data": {
+//     "PlayerID": "Postman_456",
+//     "position": { "x": 11, "y": 20, "z": 30 },
+//     "velocity": { "x": 0.5, "y": 0.5, "z": 0.5 },
+//     "rotation": { "x": 0, "y": 0, "z": 0 },
+//     "health": 100,
+//     "animationState": { "isSprinting": false, "isJumping": false, "isMoving": false, "currentAction": "idle" }
+//   }
+// }
+
+// 3. Exemplo de mensagem recebida de jogador longe
+// {
+//   "type": "PlayerData",
+//   "data": {
+//     "PlayerID": "Postman_789",
+//     "position": { "x": 100, "y": 200, "z": 300 },
+//     "velocity": { "x": 0.5, "y": 0.5, "z": 0.5 },
+//     "rotation": { "x": 0, "y": 0, "z": 0 },
+//     "health": 100,
+//     "animationState": { "isSprinting": false, "isJumping": false, "isMoving": false, "currentAction": "idle" }
+//   }
+// }
