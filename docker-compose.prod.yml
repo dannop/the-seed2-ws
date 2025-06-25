@@ -1,0 +1,11 @@
+services:
+  nginx:
+    image: nginx
+    env_file:
+      - .env
+    expose:
+      - ${VIRTUAL_PORT}
+
+networks:
+  default:
+    name: nginx-proxy
