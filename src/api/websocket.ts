@@ -46,7 +46,7 @@ export class WebSocketManager {
       ws.send(JSON.stringify({
         type: "DisconnectPlayer", 
         status: "error", 
-        message: error.message 
+        message: (error as Error).message 
       }));
     }
   }
@@ -97,7 +97,9 @@ export class WebSocketManager {
       { playerId: PlayerID }, 
       { playerId: ''}
     );
-    await this.broadcastInformation(player);
+    if (player) {
+      await this.broadcastInformation(player);
+    }
     console.log(`📡 [${PlayerID}] Desconexão broadcastada`);
   }
 

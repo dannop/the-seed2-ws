@@ -1,5 +1,5 @@
 # Usa uma imagem oficial do Node.js
-FROM node:20
+FROM node:20-alpine
 
 # Define diretório de trabalho dentro do container
 WORKDIR /usr/src/app
@@ -7,8 +7,8 @@ WORKDIR /usr/src/app
 # Copia arquivos de dependências
 COPY package*.json ./
 
-# Instala dependências
-RUN npm install
+# Instala todas as dependências (incluindo devDependencies)
+RUN npm ci && npm cache clean --force
 
 # Copia o restante do código
 COPY . .
