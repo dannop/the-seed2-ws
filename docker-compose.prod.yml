@@ -5,6 +5,7 @@ services:
       - "${VIRTUAL_PORT}:${VIRTUAL_PORT}"
     volumes:
       - .:/usr/src/app
+      - /usr/src/app/node_modules
     env_file:
       - .env
   nginx:
