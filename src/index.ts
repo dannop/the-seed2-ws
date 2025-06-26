@@ -1,141 +1,42 @@
-import { WebSocket, WebSocketServer } from 'ws';
-import { ICharacter, Character } from './models/Character';
 import dotenv from "dotenv";
-import { getNearbyCharacters } from './services/characterService';
 import { connectDB } from './config/database';
+import { WebSocketManager } from './api/websocket';
+import { RestAPIManager } from './api/rest';
+import { createServer } from 'http';
 
+// Configuração das variáveis de ambiente
 dotenv.config();
+
+// Conectar ao MongoDB
 connectDB();
 
-const PORT = Number(process.env.PORT);
-const wss = new WebSocketServer({ port: PORT, host: '0.0.0.0' });
+// Configuração da porta única
+const PORT = Number(process.env.PORT) || 3000;
 
-// Map para gerenciar conexões WebSocket em memória
-const playerConnections = new Map<string, WebSocket>();
+console.log('🎮 Iniciando servidor TheEmptySeed...');
 
-console.log(`🚀 WebSocket rodando na porta ${PORT}`);
+// Criar servidor HTTP
+const server = createServer();
 
-const broadcastInformation = async (currentCharacter: ICharacter) => {
-  console.log('📍 currentCharacter.position', currentCharacter.position);
-  
-  // Buscar apenas jogadores próximos (dentro de 500 unidades)
-  const nearbyCharacters = await getNearbyCharacters(currentCharacter, 500);
-  console.log(`👥 [${currentCharacter.playerId}] Jogadores próximos: ${nearbyCharacters.length}`);
-  
-  // Log das conexões ativas
-  console.log(`🔗 Conexões ativas no Map: ${playerConnections.size}`);
-  for (const [playerId, ws] of playerConnections.entries()) {
-    console.log(`   - ${playerId}: ${ws.readyState === WebSocket.OPEN ? 'OPEN' : 'CLOSED'}`);
-  }
-  
-  const dataToSendString = JSON.stringify({
-    type: 'NearbyPlayers',
-    data: nearbyCharacters.map(char => ({
-      playerId: char.playerId,
-      position: char.position,
-      velocity: char.velocity,
-      rotation: char.rotation,
-      health: char.health,
-      animationState: char.animationState
-    }))
-  });
+// Inicializar REST API Manager primeiro
+const restAPIManager = new RestAPIManager();
+const app = restAPIManager.getApp();
 
-  // Enviar apenas para jogadores próximos usando o Map de conexões
-  let sentCount = 0;
-  nearbyCharacters.forEach(player => {
-    const playerWs = playerConnections.get(player.playerId);
-    if (playerWs && playerWs.readyState === WebSocket.OPEN) {
-      console.log(`📨 [${player.playerId}] Enviando dados para ${player.playerId}`);
-      playerWs.send(dataToSendString);
-      sentCount++;
-    } else {
-      console.log(`⚠️ [${player.playerId}] Conexão não encontrada ou fechada`);
-    }
-  });
-  
-  console.log(`✅ [${currentCharacter.playerId}] Dados enviados para ${sentCount} jogadores`);
-};
+// Montar a aplicação Express no servidor HTTP
+server.on('request', app);
 
-wss.on('connection', (ws) => {
-  console.log("🔗 Cliente conectado!");
-  ws.on('message', async (message) => {
-    try {
-      const ParsedData = JSON.parse(message.toString());
-      console.log(`📨 Mensagem recebida do tipo: ${ParsedData.type}`);
-      
-      if (ParsedData.type === 'PlayerData') {
-        const { 
-          PlayerID, 
-          position, 
-          velocity, 
-          rotation, 
-          health,
-          animationState 
-        } = ParsedData.data;
+// Inicializar WebSocket Manager no mesmo servidor
+const websocketManager = new WebSocketManager(server);
 
-        console.log(`🎮 [${PlayerID}] Dados recebidos:`);
-        console.log(`   📍 Posição: (${position.x.toFixed(1)}, ${position.y.toFixed(1)}, ${position.z.toFixed(1)})`);
-        console.log(`   🏃 Velocidade: (${velocity.x.toFixed(1)}, ${velocity.y.toFixed(1)}, ${velocity.z.toFixed(1)})`);
-        console.log(`   🔄 Rotação: (${rotation.x.toFixed(1)}, ${rotation.y.toFixed(1)}, ${rotation.z.toFixed(1)})`);
-        console.log(`   ❤️ Health: ${health}`);
-        console.log(`   🎭 Animation State:`);
-        console.log(`      - isSprinting: ${animationState.isSprinting}`);
-        console.log(`      - isJumping: ${animationState.isJumping}`);
-        console.log(`      - isMoving: ${animationState.isMoving}`);
-        console.log(`      - currentAction: ${animationState.currentAction}`);
+// Conectar o WebSocket Manager ao REST API Manager
+restAPIManager.setWebSocketManager(websocketManager);
 
-        // Adicionar/atualizar conexão no Map
-        playerConnections.set(PlayerID, ws);
-
-        const player = await Character.findOneAndUpdate(
-          { playerId: PlayerID },
-          { position, velocity, rotation, health, animationState },
-          { new: true, upsert: true } // Cria se não existir, atualiza se existir
-        );
-        
-        console.log(`✅ [${PlayerID}] Dados salvos no MongoDB`);
-        await broadcastInformation(player);
-        console.log(`📡 [${PlayerID}] Dados broadcastados para ${wss.clients.size} clientes`);
-        
-      } else if (ParsedData.type === 'PlayerDisconnected') {
-        const { PlayerID } = ParsedData;
-        console.log(`❌ [${PlayerID}] Jogador desconectado`);
-        
-        // Remover conexão do Map
-        playerConnections.delete(PlayerID);
-        
-        const player = await Character.findOneAndUpdate(
-          { playerId: PlayerID }, 
-          { playerId: ''}
-        );
-        await broadcastInformation(player);
-        console.log(`📡 [${PlayerID}] Desconexão broadcastada`);
-      }
-    } catch (error) {
-      console.error("❌ Erro ao processar mensagem:", error);
-      console.error("📄 Mensagem original:", message.toString());
-      ws.send(JSON.stringify({
-        type: "DisconnectPlayer", 
-        status: "error", 
-        message: error.message 
-      }));
-    }
-  });
-
-  ws.on("close", () => {
-    console.log("❌ Cliente desconectado");
-    // Remover conexão do Map quando o WebSocket for fechado
-    for (const [playerId, connection] of playerConnections.entries()) {
-      if (connection === ws) {
-        playerConnections.delete(playerId);
-        console.log(`🗑️ [${playerId}] Conexão removida do Map`);
-        break;
-      }
-    }
-  });
+// Iniciar o servidor na porta única
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Servidor iniciado na porta ${PORT}`);
 });
 
-// 1. Exemplo de mensagem recebida
+// Exemplo de mensagem recebida
 // {
 //   "type": "PlayerData",
 //   "data": {
@@ -148,7 +49,7 @@ wss.on('connection', (ws) => {
 //   }
 // }
 
-// 2. Exemplo de mensagem recebida de jogador proximo
+// Exemplo de mensagem recebida de jogador proximo
 // {
 //   "type": "PlayerData",
 //   "data": {
@@ -161,7 +62,7 @@ wss.on('connection', (ws) => {
 //   }
 // }
 
-// 3. Exemplo de mensagem recebida de jogador longe
+// Exemplo de mensagem recebida de jogador longe
 // {
 //   "type": "PlayerData",
 //   "data": {
