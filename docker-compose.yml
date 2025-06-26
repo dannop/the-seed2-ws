@@ -1,0 +1,9 @@
+services:
+  node-app:
+    build: .
+    ports:
+      - "${VIRTUAL_PORT}:${VIRTUAL_PORT}"
+    volumes:
+      - .:/usr/src/app
+    env_file:
+      - .env
