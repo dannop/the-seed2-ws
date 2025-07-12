@@ -7,6 +7,7 @@ export const getNearbyCharacters = async (player: ICharacter, maxDistance: numbe
   const nearbyBox = await Character.find({
     _id: { $ne: player._id }, // Exclui o próprio jogador
     playerId: { $ne: '', $exists: true }, // Verifica se o playerId existe e não está vazio
+    isOnline: true, // Apenas jogadores online
     "position.x": { $gte: x - maxDistance, $lte: x + maxDistance },
     "position.y": { $gte: y - maxDistance, $lte: y + maxDistance },
     "position.z": { $gte: z - maxDistance, $lte: z + maxDistance },

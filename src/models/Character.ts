@@ -13,6 +13,7 @@ export interface ICharacter extends Document {
   rotation: any;
   health: any;
   animationState: any;
+  isOnline: boolean;
 }
 
 const CharacterSchema: Schema = new Schema(
@@ -22,7 +23,8 @@ const CharacterSchema: Schema = new Schema(
     velocity: { type: Schema.Types.Mixed, required: true },
     rotation: { type: Schema.Types.Mixed, required: true },
     health: { type: Schema.Types.Mixed, required: true },
-    animationState: { type: Schema.Types.Mixed, required: true }
+    animationState: { type: Schema.Types.Mixed, required: true },
+    isOnline: { type: Boolean, default: false }
   },
   { timestamps: true }
 );

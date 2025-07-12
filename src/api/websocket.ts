@@ -23,9 +23,9 @@ export class WebSocketManager {
         await this.handleMessage(ws, message);
       });
 
-      ws.on("close", () => {
+      ws.on("close", async () => {
         console.log("❌ Cliente desconectado");
-        this.removeConnection(ws);
+        await this.removeConnection(ws);
       });
     });
   }
@@ -37,8 +37,6 @@ export class WebSocketManager {
       
       if (ParsedData.type === 'PlayerData') {
         await this.handlePlayerData(ws, ParsedData);
-      } else if (ParsedData.type === 'PlayerDisconnected') {
-        await this.handlePlayerDisconnected(ParsedData);
       }
     } catch (error) {
       console.error("❌ Erro ao processar mensagem:", error);
@@ -77,37 +75,27 @@ export class WebSocketManager {
 
     const player = await Character.findOneAndUpdate(
       { playerId: PlayerID },
-      { position, velocity, rotation, health, animationState },
+      { position, velocity, rotation, health, animationState, isOnline: true },
       { new: true, upsert: true }
     );
     
-    console.log(`✅ [${PlayerID}] Dados salvos no MongoDB`);
+    console.log(`✅ [${PlayerID}] Dados salvos no MongoDB (isOnline: true)`);
     await this.broadcastInformation(player);
     console.log(`📡 [${PlayerID}] Dados broadcastados para ${this.wss.clients.size} clientes`);
   }
 
-  private async handlePlayerDisconnected(data: any) {
-    const { PlayerID } = data;
-    console.log(`❌ [${PlayerID}] Jogador desconectado`);
-    
-    // Remover conexão do Map
-    this.playerConnections.delete(PlayerID);
-    
-    const player = await Character.findOneAndUpdate(
-      { playerId: PlayerID }, 
-      { playerId: ''}
-    );
-    if (player) {
-      await this.broadcastInformation(player);
-    }
-    console.log(`📡 [${PlayerID}] Desconexão broadcastada`);
-  }
-
-  private removeConnection(ws: WebSocket) {
+  private async removeConnection(ws: WebSocket) {
     for (const [playerId, connection] of this.playerConnections.entries()) {
       if (connection === ws) {
         this.playerConnections.delete(playerId);
         console.log(`🗑️ [${playerId}] Conexão removida do Map`);
+        
+        // Marcar jogador como offline no banco de dados
+        await Character.findOneAndUpdate(
+          { playerId: playerId },
+          { isOnline: false }
+        );
+        console.log(`📴 [${playerId}] Jogador marcado como offline no banco de dados`);
         break;
       }
     }
