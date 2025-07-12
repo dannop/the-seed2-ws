@@ -116,8 +116,8 @@ export class WebSocketManager {
   private async broadcastInformation(currentCharacter: ICharacter) {
     console.log('📍 currentCharacter.position', currentCharacter.position);
     
-    // Buscar apenas jogadores próximos (dentro de 500 unidades)
-    const nearbyCharacters = await getNearbyCharacters(currentCharacter, 500);
+    const maxDistance = 2000;
+    const nearbyCharacters = await getNearbyCharacters(currentCharacter, maxDistance);
     console.log(`👥 [${currentCharacter.playerId}] Jogadores próximos: ${nearbyCharacters.length}`);
     
     // Log das conexões ativas
