@@ -138,20 +138,15 @@ export class WebSocketManager {
       }))
     });
 
-    // Enviar apenas para jogadores próximos usando o Map de conexões
-    let sentCount = 0;
-    nearbyCharacters.forEach(player => {
-      const playerWs = this.playerConnections.get(player.playerId);
-      if (playerWs && playerWs.readyState === WebSocket.OPEN) {
-        console.log(`📨 [${player.playerId}] Enviando dados para ${player.playerId}`);
-        playerWs.send(dataToSendString);
-        sentCount++;
-      } else {
-        console.log(`⚠️ [${player.playerId}] Conexão não encontrada ou fechada`);
-      }
-    });
-    
-    console.log(`✅ [${currentCharacter.playerId}] Dados enviados para ${sentCount} jogadores`);
+    // Enviar dados dos jogadores próximos para o jogador atual
+    const currentPlayerWs = this.playerConnections.get(currentCharacter.playerId);
+    if (currentPlayerWs && currentPlayerWs.readyState === WebSocket.OPEN) {
+      console.log(`📨 [${currentCharacter.playerId}] Enviando dados dos jogadores próximos para ${currentCharacter.playerId}`);
+      currentPlayerWs.send(dataToSendString);
+      console.log(`✅ [${currentCharacter.playerId}] Dados enviados para o jogador atual`);
+    } else {
+      console.log(`⚠️ [${currentCharacter.playerId}] Conexão do jogador atual não encontrada ou fechada`);
+    }
   }
 
   public getConnectionCount(): number {
